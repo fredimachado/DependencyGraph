@@ -1,9 +1,8 @@
 ﻿using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Linq;
-using System.Net.Http;
+using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -33,24 +32,14 @@ namespace DependencyGraph
 
             try
             {
-                HttpClient client = new HttpClient();
+                using (var webClient = new WebClient())
+                {
+                    File.WriteAllBytes(args[1], webClient.DownloadData("http://yuml.me/diagram/class/" + SafeYUML(yuml)));
+                }
 
-                client.GetAsync("http://yuml.me/diagram/class/" + SafeYUML(yuml)).ContinueWith(
-                    (resp) =>
-                    {
-                        HttpResponseMessage response = resp.Result;
-                        response.EnsureSuccessStatusCode();
-
-
-                        SaveDiagramAsync(response.Content, args[1]).ContinueWith(
-                            (t) =>
-                            {
-                                Process process = new Process();
-                                process.StartInfo.FileName = args[1];
-                                process.Start();
-                            });
-                    }).Wait();
-
+                Process process = new Process();
+                process.StartInfo.FileName = args[1];
+                process.Start();
             }
             catch (Exception ex)
             {
@@ -90,29 +79,6 @@ namespace DependencyGraph
             }
 
             return sb.ToString();
-        }
-
-        private static Task SaveDiagramAsync(HttpContent content, string filename)
-        {
-            FileStream fileStream = null;
-            try
-            {
-                fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
-                return content.CopyToAsync(fileStream).ContinueWith(
-                    (copyTask) =>
-                    {
-                        fileStream.Close();
-                    });
-            }
-            catch
-            {
-                if (fileStream != null)
-                {
-                    fileStream.Close();
-                }
-
-                throw;
-            }
         }
     }
 }
