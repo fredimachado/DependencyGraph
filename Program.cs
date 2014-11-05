@@ -1,7 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.IO;
 using System.Linq;
+using System.Net.Http;
 using System.Text;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -14,8 +16,8 @@ namespace DependencyGraph
         {
             if (args.Length != 2)
             {
-                Console.WriteLine("Something went wrong! Please specify the root folder and the output file path.");
-                Console.WriteLine("Example: dg.exe C:\\Projects\\ProjectFolder yuml.txt");
+                Console.WriteLine("Something went wrong! Please specify the root folder and the output PNG path.");
+                Console.WriteLine("Example: dg.exe C:\\Projects\\ProjectFolder yuml.png");
                 return 1;
             }
 
@@ -31,7 +33,24 @@ namespace DependencyGraph
 
             try
             {
-                File.WriteAllText(args[1], yuml);
+                HttpClient client = new HttpClient();
+
+                client.GetAsync("http://yuml.me/diagram/class/" + SafeYUML(yuml)).ContinueWith(
+                    (resp) =>
+                    {
+                        HttpResponseMessage response = resp.Result;
+                        response.EnsureSuccessStatusCode();
+
+
+                        SaveDiagramAsync(response.Content, args[1]).ContinueWith(
+                            (t) =>
+                            {
+                                Process process = new Process();
+                                process.StartInfo.FileName = args[1];
+                                process.Start();
+                            });
+                    }).Wait();
+
             }
             catch (Exception ex)
             {
@@ -39,6 +58,13 @@ namespace DependencyGraph
             }
 
             return 0;
+        }
+
+        private static string SafeYUML(string yuml)
+        {
+            return System.Web.HttpUtility.HtmlEncode(yuml.Replace(Environment.NewLine, ", ")
+                                                         .Replace(@"\n", ", ")
+                                                         .Replace(",,", ","));
         }
 
         private static string GenerateYUML(string rootFolder)
@@ -64,6 +90,29 @@ namespace DependencyGraph
             }
 
             return sb.ToString();
+        }
+
+        private static Task SaveDiagramAsync(HttpContent content, string filename)
+        {
+            FileStream fileStream = null;
+            try
+            {
+                fileStream = new FileStream(filename, FileMode.Create, FileAccess.Write, FileShare.None);
+                return content.CopyToAsync(fileStream).ContinueWith(
+                    (copyTask) =>
+                    {
+                        fileStream.Close();
+                    });
+            }
+            catch
+            {
+                if (fileStream != null)
+                {
+                    fileStream.Close();
+                }
+
+                throw;
+            }
         }
     }
 }
