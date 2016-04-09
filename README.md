@@ -1,4 +1,4 @@
-# DependencyGraph
+# DependencyGraph [![Build status](https://ci.appveyor.com/api/projects/status/56wrlrxf69ej1yjl?svg=true)](https://ci.appveyor.com/project/Fredi/dependencygraph)
 
 Generates dependency graphs from C# projects recursively using yuml.me
 
