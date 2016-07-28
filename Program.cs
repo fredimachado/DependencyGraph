@@ -72,7 +72,9 @@ namespace DependencyGraph
                 XNamespace ns = "http://schemas.microsoft.com/developer/msbuild/2003";
                 var dependencies = projectNode.Descendants(ns + "ItemGroup")
                                               .Descendants(ns + "ProjectReference")
-                                              .Select(d => d.Attribute("Name").Value);
+                                              .Descendants()
+                                              .Where(d => d.Name == ns + "Name")
+                                              .Select(d => d.Value);
 
                 if (includeAssemblyReferences)
                 {
