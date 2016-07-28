@@ -13,10 +13,11 @@ namespace DependencyGraph
     {
         static int Main(string[] args)
         {
-            if (args.Length != 2)
+            if (args.Length < 2)
             {
                 Console.WriteLine("Something went wrong! Please specify the root folder and the output PNG path.");
-                Console.WriteLine("Example: dg.exe C:\\Projects\\ProjectFolder yuml.png");
+                Console.WriteLine("Example: dg.exe C:\\Projects\\ProjectFolder yuml.png [-i]");
+                Console.WriteLine("Options: -i (include assembly references)");
                 return 1;
             }
 
@@ -28,13 +29,15 @@ namespace DependencyGraph
                 return 1;
             }
 
-            var yuml = GenerateYUML(rootFolder);
+            var includeAssemblyReferences = args.Length == 3 && args[2] == "-i";
+
+            var yuml = GenerateYUML(rootFolder, includeAssemblyReferences);
 
             try
             {
                 using (var webClient = new WebClient())
                 {
-                    File.WriteAllBytes(args[1], webClient.DownloadData("http://yuml.me/diagram/class/" + SafeYUML(yuml)));
+                    File.WriteAllBytes(args[1], webClient.DownloadData("http://yuml.me/diagram/scruffy/class/" + SafeYUML(yuml)));
                 }
 
                 Process process = new Process();
@@ -56,7 +59,7 @@ namespace DependencyGraph
                                                          .Replace(",,", ","));
         }
 
-        private static string GenerateYUML(string rootFolder)
+        private static string GenerateYUML(string rootFolder, bool includeAssemblyReferences = false)
         {
             var sb = new StringBuilder();
             var projects = Directory.GetFiles(rootFolder, "*.csproj", SearchOption.AllDirectories);
@@ -69,8 +72,15 @@ namespace DependencyGraph
                 XNamespace ns = "http://schemas.microsoft.com/developer/msbuild/2003";
                 var dependencies = projectNode.Descendants(ns + "ItemGroup")
                                               .Descendants(ns + "ProjectReference")
-                                              .Descendants(ns + "Name")
-                                              .Select(e => e.Value);
+                                              .Select(d => d.Attribute("Name").Value);
+
+                if (includeAssemblyReferences)
+                {
+                    var assemblyReference = projectNode.Descendants(ns + "ItemGroup")
+                                                       .Descendants(ns + "Reference")
+                                                       .Select(d => d.Attribute("Include").Value);
+                    dependencies = dependencies.Concat(assemblyReference);
+                }
 
                 foreach (var dependency in dependencies)
                 {
